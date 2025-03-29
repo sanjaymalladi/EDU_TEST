@@ -2,6 +2,7 @@
 import streamlit as st
 from edu_agent import CombinedEducationAgent
 from exp_agent import CombinedExperienceAgent
+from skills_agent import CombinedSkillsAgent
 import io
 
 import io
@@ -55,7 +56,7 @@ def read_file_content(file):
 # Streamlit application
 def main():
     st.title("📄 JD & Resume Analyzer")
-    st.write("Upload a job description and resume to analyze if the candidate meets the Education and Experience criteria.")
+    st.write("Upload a job description and resume to analyze if the candidate meets the Education, Experience, and Skills criteria.")
 
     col1, col2 = st.columns(2)
 
@@ -84,6 +85,13 @@ def main():
                 else:
                     st.warning("Experience analysis will be skipped as `exp_agent.py` was not found.")
 
+                skills_result = None
+                if CombinedSkillsAgent:
+                    skills_agent = CombinedSkillsAgent()
+                    skills_result = skills_agent.run(st.session_state['jd_text'], st.session_state['resume_text'])
+                else:
+                    st.warning("Skills analysis will be skipped as `skills_agent.py` was not found.")
+
                 if "error" in edu_result:
                     st.error(f"Education Analysis Error: {edu_result['error']}")
                 else:
@@ -94,6 +102,13 @@ def main():
                         st.error(f"Experience Analysis Error: {exp_result['error']}")
                     else:
                         display_experience_analysis(exp_result)
+
+                if skills_result:
+                    if "error" in skills_result:
+                        st.error(f"Skills Analysis Error: {skills_result['error']}")
+                    else:
+                        display_skills_analysis(skills_result)
+
         else:
             st.warning("Please upload both a job description and resume.")
 
@@ -114,6 +129,23 @@ def display_education_analysis(result: dict):
             st.progress(rating_match / 120.0)
         except:
             pass # Handle cases where rating might not be properly formatted
+def display_skills_analysis(result: dict):
+    st.header("Skills Analysis Results")
+
+    with st.expander("💪 Skills Criteria Aspects", expanded=True):
+        st.write(result['aspects'])
+
+    with st.expander("🛠️ Resume Skills Details", expanded=True):
+        st.write(result['clarifications'])
+
+    st.subheader("🧠 Skills Match Score")
+    st.write(result['evaluation'])
+    if 'Rating' in result['evaluation']:
+        try:
+            rating_match = int(result['evaluation'].split("Rating:")[-1].split("**")[0].strip())
+            st.progress(rating_match / 120.0)
+        except:
+            pass
 
 def display_experience_analysis(result: dict):
     st.header("Experience Analysis Results")
