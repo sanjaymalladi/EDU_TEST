@@ -3,6 +3,8 @@ import streamlit as st
 from edu_agent import CombinedEducationAgent
 from exp_agent import CombinedExperienceAgent
 from skills_agent import CombinedSkillsAgent
+from supervisor_agent import SupervisorAgent # Import the SupervisorAgent
+# from mh_agent import CombinedMHAgent # Removed import
 import io
 
 import io
@@ -83,87 +85,150 @@ def main():
                     exp_agent = CombinedExperienceAgent()
                     exp_result = exp_agent.run(st.session_state['jd_text'], st.session_state['resume_text'])
                 else:
-                    st.warning("Experience analysis will be skipped as `exp_agent.py` was not found.")
+                    st.warning("Experience analysis will be skipped as exp_agent.py was not found.")
 
                 skills_result = None
                 if CombinedSkillsAgent:
                     skills_agent = CombinedSkillsAgent()
                     skills_result = skills_agent.run(st.session_state['jd_text'], st.session_state['resume_text'])
                 else:
-                    st.warning("Skills analysis will be skipped as `skills_agent.py` was not found.")
+                    st.warning("Skills analysis will be skipped as skills_agent.py was not found.")
 
+                supervisor_agent = SupervisorAgent()
+                weights, weight_reasoning = supervisor_agent.get_section_weights(st.session_state['jd_text'])
+
+                edu_rating = 0
+                if edu_result and "evaluation" in edu_result and 'Rating' in edu_result['evaluation']:
+                    evaluation_str = edu_result['evaluation']
+                    if evaluation_str.startswith("- "):
+                        evaluation_str = evaluation_str[2:]
+                    try:
+                        edu_rating = int(evaluation_str.split("Rating:")[-1].split("**")[0].strip())
+                    except:
+                        edu_rating = 0 
+
+                exp_rating = 0
+                exp_rationale = ""
+                if exp_result and "evaluation" in exp_result and 'Rating' in exp_result['evaluation']:
+                    evaluation_str = exp_result['evaluation']
+                    if evaluation_str.startswith("- "):
+                        evaluation_str = evaluation_str[2:]
+                    try:
+                        exp_rating = int(evaluation_str.split("Rating:")[-1].split("**")[0].strip())
+                        exp_rationale = exp_result.get('evaluation', '')
+                    except:
+                        exp_rating = 0
+                if exp_result and 'evaluation' in exp_result and 'Evidence' in exp_result['evaluation']:
+                    exp_rationale = exp_result['evaluation']
+
+                skills_rating = 0
+                skills_rationale = ""
+                if skills_result and "evaluation" in skills_result and 'Rating' in skills_result['evaluation']:
+                    evaluation_str = skills_result['evaluation']
+                    if evaluation_str.startswith("- "):
+                        evaluation_str = evaluation_str[2:]
+                    try:
+                        skills_rating = int(evaluation_str.split("Rating:")[-1].split("**")[0].strip())
+                        skills_rationale = skills_result.get('evaluation', '')
+                    except:
+                        skills_rating = 0
+                if skills_result and 'evaluation' in skills_result and 'Evidence' in skills_result['evaluation']:
+                    skills_rationale = skills_result['evaluation']
+
+
+                # Overall Score Calculation
+                overall_rating = "NA"
+                overall_category = "NA"
+
+                if edu_rating != 0 or exp_rating != 0 or skills_rating != 0:
+                    experience_weight = weights.get('experience', 0)
+                    skills_weight = weights.get('skills', 0)
+                    education_weight = weights.get('education_and_certification', 0)
+
+                    total_weight = experience_weight + skills_weight + education_weight
+
+                    if total_weight != 100.0 and total_weight > 0:
+                        experience_weight = (experience_weight / total_weight) * 100
+                        skills_weight = (skills_weight / total_weight) * 100
+                        education_weight = (education_weight / total_weight) * 100
+                        total_weight = 100.0
+
+                    experience_score = (exp_rating * experience_weight) / 100
+                    skills_score = (skills_rating * skills_weight) / 100
+                    education_score = (edu_rating * education_weight) / 100
+
+                    overall_rating = round(experience_score + skills_score + education_score)
+                    overall_category = supervisor_agent.find_category(overall_rating)
+
+                overall_summary = supervisor_agent.generate_summary(
+                    experience_rationale=exp_rationale,
+                    skills_rationale=skills_rationale,
+                    education_rationale=edu_result.get('evaluation', '') if edu_result else ''
+                )
+                st.header("Overall Candidate Analysis")
+                st.subheader(f"Overall Rating: {overall_rating}")
+                st.write(f"**Section Weights:**")
+                for section, weight in weights.items():
+                    st.write(f"- {section.replace('_', ' ').title()}: {weight}%")
+                st.subheader("Summary")
+                st.write(overall_summary)
+
+                
+                st.header("Education Analysis Results")
                 if "error" in edu_result:
                     st.error(f"Education Analysis Error: {edu_result['error']}")
                 else:
-                    display_education_analysis(edu_result)
+                    st.subheader("🎯 Education Criteria Questions")
+                    st.write(edu_result['aspects'])
+                    st.subheader("🔍 Resume Education Details")
+                    st.write(edu_result['clarifications'])
+                    st.subheader("📊 Education Match Score")
+                    st.write(edu_result['evaluation'])
+                    if 'Rating' in edu_result['evaluation']:
+                        try:
+                            rating_match_edu = int(edu_result['evaluation'].split("Rating:")[-1].split("**")[0].strip())
+                            st.progress(rating_match_edu / 120.0)
+                        except:
+                            pass
 
                 if exp_result:
+                    st.header("Experience Analysis Results")
                     if "error" in exp_result:
                         st.error(f"Experience Analysis Error: {exp_result['error']}")
                     else:
-                        display_experience_analysis(exp_result)
+                        st.subheader("💼 Experience Criteria Aspects")
+                        st.write(exp_result['aspects'])
+                        st.subheader("📝 Resume Experience Details")
+                        st.write(exp_result['clarifications'])
+                        st.subheader("📈 Experience Match Score")
+                        st.write(exp_result['evaluation'])
+                        if 'Rating' in exp_result['evaluation']:
+                            try:
+                                rating_match_exp = int(exp_result['evaluation'].split("Rating:")[-1].split("**")[0].strip())
+                                st.progress(rating_match_exp / 120.0)
+                            except:
+                                pass
 
                 if skills_result:
+                    st.header("Skills Analysis Results")
                     if "error" in skills_result:
                         st.error(f"Skills Analysis Error: {skills_result['error']}")
                     else:
-                        display_skills_analysis(skills_result)
+                        st.subheader("💪 Skills Criteria Aspects")
+                        st.write(skills_result['aspects'])
+                        st.subheader("🛠️ Resume Skills Details")
+                        st.write(skills_result['clarifications'])
+                        st.subheader("🧠 Skills Match Score")
+                        st.write(skills_result['evaluation'])
+                        if 'Rating' in skills_result['evaluation']:
+                            try:
+                                rating_match_skills = int(skills_result['evaluation'].split("Rating:")[-1].split("**")[0].strip())
+                                st.progress(rating_match_skills / 100.0)
+                            except:
+                                pass
 
         else:
             st.warning("Please upload both a job description and resume.")
-
-def display_education_analysis(result: dict):
-    st.header("Education Analysis Results")
-
-    with st.expander("🎯 Education Criteria Questions", expanded=True):
-        st.write(result['aspects'])
-
-    with st.expander("🔍 Resume Education Details", expanded=True):
-        st.write(result['clarifications'])
-
-    st.subheader("📊 Education Match Score")
-    st.write(result['evaluation'])
-    if 'Rating' in result['evaluation']:
-        try:
-            rating_match = int(result['evaluation'].split("Rating:")[-1].split("**")[0].strip())
-            st.progress(rating_match / 120.0)
-        except:
-            pass # Handle cases where rating might not be properly formatted
-def display_skills_analysis(result: dict):
-    st.header("Skills Analysis Results")
-
-    with st.expander("💪 Skills Criteria Aspects", expanded=True):
-        st.write(result['aspects'])
-
-    with st.expander("🛠️ Resume Skills Details", expanded=True):
-        st.write(result['clarifications'])
-
-    st.subheader("🧠 Skills Match Score")
-    st.write(result['evaluation'])
-    if 'Rating' in result['evaluation']:
-        try:
-            rating_match = int(result['evaluation'].split("Rating:")[-1].split("**")[0].strip())
-            st.progress(rating_match / 120.0)
-        except:
-            pass
-
-def display_experience_analysis(result: dict):
-    st.header("Experience Analysis Results")
-
-    with st.expander("💼 Experience Criteria Aspects", expanded=True):
-        st.write(result['aspects'])
-
-    with st.expander("📝 Resume Experience Details", expanded=True):
-        st.write(result['clarifications'])
-
-    st.subheader("📈 Experience Match Score")
-    st.write(result['evaluation'])
-    if 'Rating' in result['evaluation']:
-        try:
-            rating_match = int(result['evaluation'].split("Rating:")[-1].split("**")[0].strip())
-            st.progress(rating_match / 120.0)
-        except:
-            pass # Handle cases where rating might not be properly formatted
 
 if __name__ == "__main__":
     main()
