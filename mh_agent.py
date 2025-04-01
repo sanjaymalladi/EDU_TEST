@@ -27,33 +27,6 @@ class CombinedMHAgent:
         self.model = model
 
         # Define the prompts for each step
-        self.aspects_prompt = PromptTemplate(
-            input_variables=["job_description"],
-            template="""
-    You are an expert recruiter specialized in analyzing resumes against job descriptions (JDs). Your task is to formulate checkpoints that focus on verifying criteria that are explicitly mentioned as must-have in the JD. These checkpoints will help generate insightful responses in the next step, ensuring the resume is analyzed against the critical, non-negotiable requirements, if any, outlined in the JD.
-
-    **Input**: Job Description (JD)
-**Job Description**:
-{job_description}
-    **Output**: Formulate 2 to 3 evaluation checkpoints/criteria focused solely on the must-have requirements. These checkpoints/criteria will serve as evaluation criteria for the next stage, where the candidate's resume will be checked for evidence and reasoning.
-
-    ### Steps:
-    1) Understand the JD and determine the number of checkpoints (between 2-3) required depending on the specifications from the JD and the context of the role. For freshers/career beginners, the number of checkpoints could be less in number.
-    2) With a holistic and pragmatic approach, formulate the checkpoints that cover the verifiable aspects usually available from resumes. Note that the cultural aspects or thinking process or future plans of the candidate should not be part of this exercise.
-
-    **Guidelines**:
-    1. Identify parameters explicitly marked as must-have in the JD.
-        a. Consider the context and include aspects labeled as “required,” “mandatory,” “essential,” “prerequisite,” or similar if appropriate to be considered as must-have.
-        b. Focus only on very critical criteria that, if missing, should lead to disqualification of the candidate.
-    2. Clearly differentiate between must-haves and good-to-haves/preferences.
-        a. Exclude any parameters described as “preferred,” “nice-to-have,” or optional.
-    3. If specific education, certification, or experience is not explicitly mentioned as a must-have, do not include it in this section.
-    
-    **Output Format:**
-    Checkpoint 1: [Description of checkpoint]
-    Checkpoint 2: [Description of checkpoint]"""
-        )
-
         self.clarification_prompt = PromptTemplate(
             input_variables=["checkpoints", "resume"],
             template= """
@@ -122,35 +95,30 @@ class CombinedMHAgent:
     """
         )
 
-    def run(self, jd_text: str, resume_text: str) -> dict:
+    def run(self, jd_text: str, resume_text: str, aspects: dict) -> dict:
         try:
-            # Step 1: Generate aspects (checkpoints) from JD
-            aspects = self.generate_aspects(jd_text)
-            if not aspects:
-                return {"error": "Failed to generate aspects."}
+            # Step 1: Use provided aspects (checkpoints) from JD
+            aspects_text = aspects.get('mh', '')
+            if not aspects_text:
+                return {"error": "No must-have aspects provided."}
 
             # Step 2: Generate clarifications (based on resume)
-            clarifications = self.generate_clarifications(aspects, resume_text)
+            clarifications = self.generate_clarifications(aspects_text, resume_text)
             if not clarifications:
                 return {"error": "Failed to generate clarifications."}
 
             # Step 3: Perform evaluation (based on aspects and clarifications)
-            evaluation = self.evaluate(jd_text, resume_text, aspects, clarifications)
+            evaluation = self.evaluate(jd_text, resume_text, aspects_text, clarifications)
             if not evaluation:
                 return {"error": "Failed to perform evaluation."}
 
             return {
-                'aspects': aspects,
+                'aspects': aspects_text,
                 'clarifications': clarifications,
                 'evaluation': evaluation
             }
         except Exception as e:
             return {"error": f"An error occurred: {str(e)}"}
-
-    def generate_aspects(self, job_description: str) -> str:
-        prompt_text = self.aspects_prompt.format(job_description=job_description)
-        response = self.model.invoke([HumanMessage(content=prompt_text)])
-        return response.content.strip()
 
     def generate_clarifications(self, checkpoints: str, resume: str) -> str:
         prompt_text = self.clarification_prompt.format(checkpoints=checkpoints, resume=resume)
@@ -175,7 +143,7 @@ if __name__ == "__main__":
     jd_text = """
     We are looking for a Data Scientist - Team Lead. The ideal candidate should have a Master's degree in Data Science or related field with a strong emphasis on statistical modeling and machine learning.
     Preferred certifications include: AWS Certified Machine Learning – Specialty, Google Cloud Professional Data Scientist.
-    A Bachelor's degree in Computer Science or Statistics is also desirable. Must have leadership experience of at least 5 years managing data engineering and analytics teams. Experience working in a European, ideally German, company with cross-cultural collaboration skills. Proficiency in data modeling, ETL processes, and data warehousing. Advanced programming skills in SQL and Python. Expertise with advanced analytics tools and techniques, including machine learning and data visualization. MUST HAVE DEGREE IN DATA SCIENCE OR RELATED FIELD. 
+    A Bachelor's degree in Computer Science or Statistics is also desirable. Must have leadership experience of at least 5 years managing data engineering and analytics teams. Experience working in a European, ideally German, company with cross-cultural collaboration skills. Proficiency in data modeling, ETL processes, and data warehousing. Advanced programming skills in SQL and Python. Expertise with advanced analytics tools and techniques, including machine learning and data visualization. MUST HAVE DEGREE IN DATA SCIENCE OR RELATED FIELD.
     """
     resume_text = """
     John Doe holds a Master of Science in Data Science from XYZ University, graduated in May 2022. His master's thesis focused on statistical modeling.
@@ -184,5 +152,13 @@ if __name__ == "__main__":
     Led a team of data scientists for the past 3 years at PQR Corp, where he was responsible for developing and deploying machine learning models using Python and R. Successfully delivered several data-driven solutions that improved business outcomes. Prior to that, he worked as a Data Engineer at a multinational company for 7 years, where he built data pipelines and managed data warehouses.
     """
 
-    result = agent.run(jd_text, resume_text)
+    # Create a sample aspects dictionary (in a real scenario, this would come from the AspectsAgent)
+    aspects = {
+        'mh': """
+        Checkpoint 1: Must have a degree in Data Science or related field.
+        Checkpoint 2: Must have leadership experience of at least 5 years managing data engineering and analytics teams.
+        """
+    }
+
+    result = agent.run(jd_text, resume_text, aspects)
     print(result)

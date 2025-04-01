@@ -20,75 +20,12 @@ model = ChatGoogleGenerativeAI(
     max_output_tokens=4000,  # Use max_output_tokens instead of max_tokens
     top_p=1
 )
-
 # Define the combined agent class
 class CombinedExperienceAgent:
     def __init__(self):
         self.model = model
 
         # Define the prompts for each step
-        self.aspects_prompt = PromptTemplate(
-            input_variables=["job_description"],
-            template="""
-You are an expert recruiter specializing in analyzing resumes against job descriptions (JDs). Your task is to formulate 3 to 10 (from JD) check points that will help generate factual insights from the CV in the next step to analyse the quality and suitability of the past professional experience strictly from the resume. Ensure that these checkpoints focus solely on the candidate's work history, including the application of skills and qualifications within their roles. Do not create checkpoints that solely ask about the presence of educational qualifications or certifications.
-
-**Input**: Job Description (JD)
-**Job Description**:
-{job_description}
-**Output**: Formulate 3 to 10 checkpoints/criteria focused solely on the candidate's past professional experience and how their skills and qualifications were applied.
-These checkpoints/criteria will serve as criteria for the next step, where the candidate's resume will be checked for evidence and factual reasoning related to their work history.
-
-###Steps:
-    1) Understand the JD and determine the number of checkpoints (between 3-10) required depending on the complexity and experience specifications from the JD.
-        a. For instance, roles requiring less experience may need fewer checkpoints (between 3-5).
-        b. Cover the contents listed below in order to understand the suitability of the professional experience to the job description/job.
-        c. For JDs which are not written in detail regarding experience, keep the number of checkpoints relatively low.
-
-    2) With a holistic and pragmatic approach, formulate the checkpoints that cover the verifiable aspects of professional experience usually available from resumes. Note that behavioral aspects, cultural fit, thinking process, or future plans should not be part of this exercise. Focus strictly on past work experience and the application of skills.
-**Guidelines**: Ensure that the output set of checkpoints/criteria should adhere to each of the following guidelines:
-
-    1) Directly address must-have or critical *experience-related* requirements explicitly or implicitly outlined in the JD, focusing on how these were applied in past roles.
-
-    2) Include at least one checkpoint for understanding the actual years of experience required for key technologies/core areas and overall years of professional experience in the field.
-
-    3) Include at least one checkpoint to assess the relevance of recent professional experience, responsibilities, and alignment with the core domain specified in the JD.
-        a. Checkpoint Example: Check if the candidate’s most recent role and responsibilities align with the key responsibilities outlined in the JD. Highlight deviations from the core role and their duration.
-
-    4) Include at least one checkpoint to analyze career stability, such as job switches, career gaps (exceeding two months), and whether the candidate is currently employed and for how long.
-        a. Checkpoint Example: Examine the chronology of job switches and career gaps. Are there gaps longer than two months between jobs? Has the candidate demonstrated frequent job changes? Are they currently employed in a relevant role? **Think step by step.**
-
-    5) Address industry-specific requirements if applicable. If the JD specifies the role to be industry-specific, include a checkpoint for assessing relevant industry experience. Skip this if the role is not industry-specific.
-
-    6) Include one checkpoint to evaluate the candidate's career progression and responsibilities in past professional roles, ensuring a logical sequence in work history and growth in responsibilities. This checkpoint is more important in roles which have a higher number of years of experience and can be ignored for beginners.
-
-    7) Include checkpoints that probe into detailed subtopics or concepts relevant to success in the role, eliciting comprehensive insights about the candidate’s professional qualifications and their application in practical scenarios.
-
-    8) Include a checkpoint to uncover the candidate’s achievements or individual contributions to past projects or assignments for a nuanced understanding of their professional role and impact.
-
-    9) Core Domain expertise/experience with respect to the role specified in the JD, focusing on the practical application of this expertise in previous roles.
-        a. Example: For a Workday HCM professional, differentiate their practical experience from Workday Finance implementations.
-
-    *Important note:* Focus on creating the most relevant checkpoints/criteria that will guide to uncover the Professional Experience requirements mentioned in the JD, emphasizing the application of skills and qualifications within their work history. Adjust the number of checkpoints/criteria dynamically between 3 to 10 depending on the specific requirements outlined in the JD while following the provided guidelines. Think step by step.
-
-### Output Format:
-    sample output 1:
-        Checkpoint 1: [Description of checkpoint related to professional experience and application of skills]
-        Checkpoint 2: [Description of checkpoint related to professional experience and application of skills]
-        ....
-        Checkpoint 8: [Description of checkpoint related to professional experience and application of skills]
-    sample output 2:
-        Checkpoint 1: [Description of checkpoint related to professional experience and application of skills]
-        Checkpoint 2: [Description of checkpoint related to professional experience and application of skills]
-        ....
-        Checkpoint 6: [Description of checkpoint related to professional experience and application of skills]
-    sample output 3:
-        Checkpoint 1: [Description of checkpoint related to professional experience and application of skills]
-        Checkpoint 2: [Description of checkpoint related to professional experience and application of skills]
-        ....
-        Checkpoint 9: [Description of checkpoint related to professional experience and application of skills]
-    """
-        )
-
         self.clarification_prompt = PromptTemplate(
             input_variables=["checkpoints", "resume"],
             template= """
@@ -115,7 +52,7 @@ Follow the guidelines to ensure the quality of the output.
 
     3) Industry Relevance: Evaluate the organizations the candidate has worked for and their industries. Do not rely solely on explicit mentions by the candidate, as industries are often implied by context within their professional experience.
 
-    4) Progressive Exploration: - Explore the candidate’s responsibilities in past professional roles progressively, ensuring logical sequencing and growth in their career.
+    4) Progressive Exploration: - Explore the candidate's responsibilities in past professional roles progressively, ensuring logical sequencing and growth in their career.
     - Uncover achievements or individual contributions to previous projects or assignments for a nuanced understanding of their professional role and impact.
 
     5) Domain Expertise: Clarify the candidate's domain expertise and experience with respect to the role specified in the JD, providing details of how this expertise was applied in their previous roles.
@@ -179,35 +116,30 @@ Provide justification pointers for the rating, explaining why the candidate's pr
     """
         )
 
-    def run(self, jd_text: str, resume_text: str) -> dict:
+    def run(self, jd_text: str, resume_text: str, aspects: dict) -> dict:
         try:
-            # Step 1: Generate aspects (checkpoints) from JD
-            aspects = self.generate_aspects(jd_text)
-            if not aspects:
-                return {"error": "Failed to generate aspects."}
+            # Step 1: Use provided aspects (checkpoints) from JD
+            aspects_text = aspects.get('exp', '')
+            if not aspects_text:
+                return {"error": "No experience aspects provided."}
 
             # Step 2: Generate clarifications (based on resume)
-            clarifications = self.generate_clarifications(aspects, resume_text)
+            clarifications = self.generate_clarifications(aspects_text, resume_text)
             if not clarifications:
                 return {"error": "Failed to generate clarifications."}
 
             # Step 3: Perform evaluation (based on aspects and clarifications)
-            evaluation = self.evaluate(jd_text, resume_text, aspects, clarifications)
+            evaluation = self.evaluate(jd_text, resume_text, aspects_text, clarifications)
             if not evaluation:
                 return {"error": "Failed to perform evaluation."}
 
             return {
-                'aspects': aspects,
+                'aspects': aspects_text,
                 'clarifications': clarifications,
                 'evaluation': evaluation
             }
         except Exception as e:
             return {"error": f"An error occurred: {str(e)}"}
-
-    def generate_aspects(self, job_description: str) -> str:
-        prompt_text = self.aspects_prompt.format(job_description=job_description)
-        response = self.model.invoke([HumanMessage(content=prompt_text)])
-        return response.content.strip()
 
     def generate_clarifications(self, checkpoints: str, resume: str) -> str:
         prompt_text = self.clarification_prompt.format(checkpoints=checkpoints, resume=resume)
@@ -241,5 +173,15 @@ if __name__ == "__main__":
     Led a team of data scientists for the past 3 years at PQR Corp, where he was responsible for developing and deploying machine learning models using Python and R. Successfully delivered several data-driven solutions that improved business outcomes. Prior to that, he worked as a Data Engineer at a multinational company for 7 years, where he built data pipelines and managed data warehouses.
     """
 
-    result = agent.run(jd_text, resume_text)
+    # Create a sample aspects dictionary (in a real scenario, this would come from the AspectsAgent)
+    aspects = {
+        'exp': """
+        Checkpoint 1: Verify if the candidate has at least 5 years of leadership experience managing data engineering and analytics teams.
+        Checkpoint 2: Check for experience in data modeling, ETL processes, and data warehousing.
+        Checkpoint 3: Assess experience with machine learning and data visualization in a professional setting.
+        Checkpoint 4: Evaluate experience working in a European/German company with cross-cultural collaboration.
+        """
+    }
+
+    result = agent.run(jd_text, resume_text, aspects)
     print(result)

@@ -1,5 +1,6 @@
 # app.py
 import streamlit as st
+from aspects_agent import AspectsAgent  # Add import for AspectsAgent
 from edu_agent import CombinedEducationAgent
 from exp_agent import CombinedExperienceAgent
 from skills_agent import CombinedSkillsAgent
@@ -7,8 +8,34 @@ from supervisor_agent import SupervisorAgent # Import the SupervisorAgent
 from mh_agent import CombinedMHAgent  # Add import for MH agent
 # from mh_agent import CombinedMHAgent # Removed import
 import io
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+import datetime
+import os
+from dotenv import load_dotenv
+from langchain_google_genai import ChatGoogleGenerativeAI
 
 import io
+
+# Load environment variables
+load_dotenv()
+
+# Set environment variables for model API key and model type
+api_key = os.getenv("GOOGLE_API_KEY")
+if not api_key:
+    raise ValueError("GOOGLE_API_KEY environment variable is not set")
+
+# Initialize the chat model
+model = ChatGoogleGenerativeAI(
+    model="gemini-2.0-flash",  # Specify the Gemini model name
+    google_api_key=api_key,
+    temperature=0.0,
+    max_output_tokens=4000,  # Use max_output_tokens instead of max_tokens
+    top_p=1
+)
 
 # Helper function to extract text from a PDF file
 def extract_text_from_pdf(file):
@@ -56,6 +83,112 @@ def read_file_content(file):
         st.error(f"Error reading file {file.name}: {str(e)}")
         return None
 
+def generate_pdf_report(jd_text, resume_text, edu_result, exp_result, skills_result, mh_result, 
+                       overall_rating, overall_category, weights, overall_summary):
+    """Generate a PDF report of the analysis results."""
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter)
+    styles = getSampleStyleSheet()
+    elements = []
+    
+    # Title
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['Heading1'],
+        fontSize=24,
+        spaceAfter=30
+    )
+    elements.append(Paragraph("JD & Resume Analysis Report", title_style))
+    
+    # Date
+    date_style = ParagraphStyle(
+        'DateStyle',
+        parent=styles['Normal'],
+        fontSize=10,
+        textColor=colors.gray
+    )
+    elements.append(Paragraph(f"Generated on: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", date_style))
+    elements.append(Spacer(1, 20))
+    
+    # Overall Analysis
+    elements.append(Paragraph("Overall Candidate Analysis", styles['Heading2']))
+    elements.append(Paragraph(f"Overall Rating: {overall_rating}", styles['Normal']))
+    elements.append(Paragraph(f"Category: {overall_category}", styles['Normal']))
+    
+    # Section Weights
+    elements.append(Paragraph("Section Weights:", styles['Heading3']))
+    weight_data = [[section.replace('_', ' ').title(), f"{weight}%"] 
+                   for section, weight in weights.items()]
+    weight_table = Table(weight_data, colWidths=[2*inch, 1*inch])
+    weight_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 14),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+        ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
+        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 1), (-1, -1), 12),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+    ]))
+    elements.append(weight_table)
+    
+    # Summary
+    elements.append(Paragraph("Summary:", styles['Heading3']))
+    elements.append(Paragraph(overall_summary, styles['Normal']))
+    elements.append(Spacer(1, 20))
+    
+    # Must-Have Analysis
+    if mh_result and "error" not in mh_result:
+        elements.append(Paragraph("Must-Have Requirements Analysis", styles['Heading2']))
+        elements.append(Paragraph("Must-Have Criteria:", styles['Heading3']))
+        elements.append(Paragraph(mh_result['aspects'], styles['Normal']))
+        elements.append(Paragraph("Resume Evidence:", styles['Heading3']))
+        elements.append(Paragraph(mh_result['clarifications'], styles['Normal']))
+        elements.append(Paragraph("Evaluation:", styles['Heading3']))
+        elements.append(Paragraph(mh_result['evaluation'], styles['Normal']))
+        elements.append(Spacer(1, 20))
+    
+    # Education Analysis
+    if edu_result and "error" not in edu_result:
+        elements.append(Paragraph("Education Analysis", styles['Heading2']))
+        elements.append(Paragraph("Education Criteria:", styles['Heading3']))
+        elements.append(Paragraph(edu_result['aspects'], styles['Normal']))
+        elements.append(Paragraph("Resume Education Details:", styles['Heading3']))
+        elements.append(Paragraph(edu_result['clarifications'], styles['Normal']))
+        elements.append(Paragraph("Education Match Score:", styles['Heading3']))
+        elements.append(Paragraph(edu_result['evaluation'], styles['Normal']))
+        elements.append(Spacer(1, 20))
+    
+    # Experience Analysis
+    if exp_result and "error" not in exp_result:
+        elements.append(Paragraph("Experience Analysis", styles['Heading2']))
+        elements.append(Paragraph("Experience Criteria:", styles['Heading3']))
+        elements.append(Paragraph(exp_result['aspects'], styles['Normal']))
+        elements.append(Paragraph("Resume Experience Details:", styles['Heading3']))
+        elements.append(Paragraph(exp_result['clarifications'], styles['Normal']))
+        elements.append(Paragraph("Experience Match Score:", styles['Heading3']))
+        elements.append(Paragraph(exp_result['evaluation'], styles['Normal']))
+        elements.append(Spacer(1, 20))
+    
+    # Skills Analysis
+    if skills_result and "error" not in skills_result:
+        elements.append(Paragraph("Skills Analysis", styles['Heading2']))
+        elements.append(Paragraph("Skills Criteria:", styles['Heading3']))
+        elements.append(Paragraph(skills_result['aspects'], styles['Normal']))
+        elements.append(Paragraph("Resume Skills Details:", styles['Heading3']))
+        elements.append(Paragraph(skills_result['clarifications'], styles['Normal']))
+        elements.append(Paragraph("Skills Match Score:", styles['Heading3']))
+        elements.append(Paragraph(skills_result['evaluation'], styles['Normal']))
+    
+    # Build PDF
+    doc.build(elements)
+    buffer.seek(0)
+    return buffer
+
 # Streamlit application
 def main():
     st.title("📄 JD & Resume Analyzer")
@@ -78,20 +211,25 @@ def main():
     if st.button("Analyze"):
         if jd_file and resume_file:
             with st.spinner("Analyzing documents..."):
+                # First, generate aspects for all sections
+                aspects_agent = AspectsAgent()
+                aspects = aspects_agent.generate_all_aspects(st.session_state['jd_text'])
+                
+                # Now use these aspects in each agent
                 edu_agent = CombinedEducationAgent()
-                edu_result = edu_agent.run(st.session_state['jd_text'], st.session_state['resume_text'])
+                edu_result = edu_agent.run(st.session_state['jd_text'], st.session_state['resume_text'], aspects)
 
                 exp_result = None
                 if CombinedExperienceAgent:
                     exp_agent = CombinedExperienceAgent()
-                    exp_result = exp_agent.run(st.session_state['jd_text'], st.session_state['resume_text'])
+                    exp_result = exp_agent.run(st.session_state['jd_text'], st.session_state['resume_text'], aspects)
                 else:
                     st.warning("Experience analysis will be skipped as exp_agent.py was not found.")
 
                 skills_result = None
                 if CombinedSkillsAgent:
                     skills_agent = CombinedSkillsAgent()
-                    skills_result = skills_agent.run(st.session_state['jd_text'], st.session_state['resume_text'])
+                    skills_result = skills_agent.run(st.session_state['jd_text'], st.session_state['resume_text'], aspects)
                 else:
                     st.warning("Skills analysis will be skipped as skills_agent.py was not found.")
 
@@ -99,7 +237,7 @@ def main():
                 mh_result = None
                 if CombinedMHAgent:
                     mh_agent = CombinedMHAgent()
-                    mh_result = mh_agent.run(st.session_state['jd_text'], st.session_state['resume_text'])
+                    mh_result = mh_agent.run(st.session_state['jd_text'], st.session_state['resume_text'], aspects)
                 else:
                     st.warning("Must-Have analysis will be skipped as mh_agent.py was not found.")
 
@@ -199,6 +337,28 @@ def main():
                     st.write(f"- {section.replace('_', ' ').title()}: {weight}%")
                 st.subheader("Summary")
                 st.write(overall_summary)
+
+                # Generate PDF report
+                pdf_buffer = generate_pdf_report(
+                    jd_text=st.session_state['jd_text'],
+                    resume_text=st.session_state['resume_text'],
+                    edu_result=edu_result,
+                    exp_result=exp_result,
+                    skills_result=skills_result,
+                    mh_result=mh_result,
+                    overall_rating=overall_rating,
+                    overall_category=overall_category,
+                    weights=weights,
+                    overall_summary=overall_summary
+                )
+
+                # Add download report button
+                st.download_button(
+                    label="📥 Download Analysis Report",
+                    data=pdf_buffer,
+                    file_name=f"resume_analysis_report_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
+                    mime="application/pdf"
+                )
 
                 # Add Must-Have Analysis Results section
                 if mh_result:

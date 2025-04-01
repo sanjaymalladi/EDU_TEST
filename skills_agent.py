@@ -27,47 +27,6 @@ class CombinedSkillsAgent:
         self.model = model
 
         # Define the prompts for each step
-        self.aspects_prompt = PromptTemplate(
-    input_variables=["job_description"],
-    template="""
-You are an expert recruiter specializing in analyzing resumes against job descriptions (JDs). Your task is to formulate only skills verification checkpoints that will generate factual insights in the next step, helping to analyze the candidate’s technical and domain skills in relation to the job requirements. Keep in consideration that resumes may list skills without detailed examples.
-
-**Input**: Job Description (JD)
-**Job Description**:
-{job_description}
-**Output**: Formulate 3-5 evaluation checkpoints/criteria focused solely on the candidate's technical and domain skills as they would typically be listed in a resume's "Skills" section. These checkpoints/criteria will serve as criteria for the next step, where the candidate's resume will be checked for evidence of these skills.
-
-###Steps:
-
-    1) Understand the JD and identify the key technical and domain skills explicitly mentioned or strongly implied for success in the role. Determine the number of checkpoints (between 3-5) based on the number of critical skills.
-    2) Focus on skills that are typically listed in a "Skills" section of a resume, such as programming languages, tools, technologies, methodologies, and specific areas of expertise. Avoid creating checkpoints related to qualifications, certifications, experience levels (unless the JD specifies a skill as "X years of experience with Y"), roles, or responsibilities.
-
-**Guidelines**: Ensure that the output set of checkpoints/criteria should adhere to each of the following guidelines:
-
-    1) Directly address must-have or critical technical/domain skills explicitly mentioned in the JD.
-        a. Example: If the JD requires "Python," a checkpoint could be "Verify if the candidate lists Python as a skill."
-    2) Account for implicit skill requirements necessary for success in the role that would typically be listed as skills.
-        a. Example: If the role involves machine learning, a checkpoint could be "Check if the candidate lists any machine learning algorithms or frameworks (e.g., scikit-learn, TensorFlow)."
-    3) Focus on the skills themselves, not on how or where they were applied (this will be assessed implicitly if the skills are listed).
-    4) Include one checkpoint for each major category of required skills mentioned in the JD.
-        a. Example: If the JD mentions "Programming Languages," "Databases," and "Data Visualization Tools," aim for at least one checkpoint for each category.
-    5) Differentiate between specific skills if the JD is specific.
-        a. Example: If the JD requires "SQL" and "NoSQL," create separate checkpoints for each.
-
-*Important note:* Focus on creating concise, actionable checkpoints that directly ask about the presence of specific technical and domain skills that a candidate would typically list in their resume's "Skills" section. Adjust the number of checkpoints/criteria dynamically between 3-5 depending on the specific skill requirements outlined in the JD. Think step by step about what skills a candidate would list.
-
-### Output Format:
-    sample output 1:
-        Checkpoint 1: [Verify if the candidate lists proficiency in Python.]
-        Checkpoint 2: [Check if the candidate mentions experience with SQL databases.]
-        Checkpoint 3: [Confirm if the candidate lists any data visualization tools like Tableau or PowerBI.]
-    sample output 2:
-        Checkpoint 1: [Verify if the candidate lists expertise in machine learning.]
-        Checkpoint 2: [Check if the candidate mentions specific ETL tools.]
-        Checkpoint 3: [Confirm if the candidate lists cloud platforms like AWS or Azure.]
-    """
-    )
-
         self.clarification_prompt = PromptTemplate(
             input_variables=["checkpoints", "resume"],
             template="""
@@ -99,14 +58,14 @@ You are required to take a pragmatic and holistic approach considering the conte
             input_variables=["job_description", "candidates_profile", "checkpoints", "answer_script"],
             template="""
 You are an expert recruiter specializing in evaluating resumes against job descriptions.
-Your task is to evaluate and assign a numeric rating for the candidate's skills based solely on the "Checkpoints" and "Answer Script" to determine how well they align with the JD’s skill requirements. Provide a factual 70-100 word justification focusing only on skills, avoiding any mention of experience, years, or roles. Think step by step.
+Your task is to evaluate and assign a numeric rating for the candidate's skills based solely on the "Checkpoints" and "Answer Script" to determine how well they align with the JD's skill requirements. Provide a factual 70-100 word justification focusing only on skills, avoiding any mention of experience, years, or roles. Think step by step.
 
 **Input**:
 - Job Description: {job_description}
 - Checkpoints: {checkpoints}
 - Answer Script: {answer_script}
 
-**Output**: A score and a 70-100 word justification explaining the candidate’s skill alignment or gaps with the JD, using specific skill examples from the "Checkpoints" and "Answer Script." Do not mention experience, years, or roles.
+**Output**: A score and a 70-100 word justification explaining the candidate's skill alignment or gaps with the JD, using specific skill examples from the "Checkpoints" and "Answer Script." Do not mention experience, years, or roles.
 
 ### Steps:
 
@@ -114,7 +73,7 @@ Your task is to evaluate and assign a numeric rating for the candidate's skills 
     i) Identify must-have skills and competencies critical to the role.
     ii) Recognize additional skills that enhance suitability but are not mandatory.
 
-2) **Analyze and Score the Candidate’s Skills from "Checkpoints" and "Answer Script":**
+2) **Analyze and Score the Candidate's Skills from "Checkpoints" and "Answer Script":**
     **Factors to Consider While Scoring:**
     i) **Depth of Expertise**: Assess the depth of proficiency in must-have and additional skills relative to the JD. Prioritize core domain skills over additional ones.
     ii) **Presence and Mention**: Evaluate if the candidate explicitly mentions the required skills in their resume.
@@ -127,46 +86,41 @@ Your task is to evaluate and assign a numeric rating for the candidate's skills 
     iii) 61–100: Strong alignment with most or all required skills explicitly mentioned.
 
 4) **Provide Factual Justification:**
-    a) Write a 70-100 word justification explaining why the candidate’s skills align or do not align with the JD. Use specific skill examples from the "Checkpoints" and "Answer Script." Do not mention experience, years, projects, or roles. Focus solely on the presence and relevance of the skills.
+    a) Write a 70-100 word justification explaining why the candidate's skills align or do not align with the JD. Use specific skill examples from the "Checkpoints" and "Answer Script." Do not mention experience, years, projects, or roles. Focus solely on the presence and relevance of the skills.
 
 ### Output Format:
 - **Rating:** Numeric score between 1 and 100.
 - **Evidence:** A 70-100 word justification focusing solely on skills, their presence, specificity, and relevance, supported by examples from the input.
 
 ### Constraints:
-- Avoid referencing experience (e.g., years worked, projects completed, leadership roles), non-skill factors (e.g., education, certifications), or the candidate's professional history unless explicitly part of the JD’s skill requirements (e.g., "5+ years experience with Python" would imply a skill). Focus solely on the skills listed or implied.
+- Avoid referencing experience (e.g., years worked, projects completed, leadership roles), non-skill factors (e.g., education, certifications), or the candidate's professional history unless explicitly part of the JD's skill requirements (e.g., "5+ years experience with Python" would imply a skill). Focus solely on the skills listed or implied.
 """
         )
 
-    def run(self, jd_text: str, resume_text: str) -> dict:
+    def run(self, jd_text: str, resume_text: str, aspects: dict) -> dict:
         try:
-            # Step 1: Generate aspects (checkpoints) from JD
-            aspects = self.generate_aspects(jd_text)
-            if not aspects:
-                return {"error": "Failed to generate aspects."}
+            # Step 1: Use provided aspects (checkpoints) from JD
+            aspects_text = aspects.get('skills', '')
+            if not aspects_text:
+                return {"error": "No skills aspects provided."}
 
             # Step 2: Generate clarifications (based on resume)
-            clarifications = self.generate_clarifications(aspects, resume_text)
+            clarifications = self.generate_clarifications(aspects_text, resume_text)
             if not clarifications:
                 return {"error": "Failed to generate clarifications."}
 
             # Step 3: Perform evaluation (based on aspects and clarifications)
-            evaluation = self.evaluate(jd_text, resume_text, aspects, clarifications)
+            evaluation = self.evaluate(jd_text, resume_text, aspects_text, clarifications)
             if not evaluation:
                 return {"error": "Failed to perform evaluation."}
 
             return {
-                'aspects': aspects,
+                'aspects': aspects_text,
                 'clarifications': clarifications,
                 'evaluation': evaluation
             }
         except Exception as e:
             return {"error": f"An error occurred: {str(e)}"}
-
-    def generate_aspects(self, job_description: str) -> str:
-        prompt_text = self.aspects_prompt.format(job_description=job_description)
-        response = self.model.invoke([HumanMessage(content=prompt_text)])
-        return response.content.strip()
 
     def generate_clarifications(self, checkpoints: str, resume: str) -> str:
         prompt_text = self.clarification_prompt.format(checkpoints=checkpoints, resume=resume)
@@ -200,5 +154,14 @@ if __name__ == "__main__":
     Led a team of data scientists for the past 3 years at PQR Corp, where he was responsible for developing and deploying machine learning models using Python and R. Successfully delivered several data-driven solutions that improved business outcomes. Prior to that, he worked as a Data Engineer at a multinational company for 7 years, where he built data pipelines and managed data warehouses. Skills: Python (ML - scikit-learn, Pandas, NumPy, SciPy), SQL, Data Modeling, ETL, Data Warehousing, Machine Learning, Data Visualization, AWS.
     """
 
-    result = agent.run(jd_text, resume_text)
+    # Create a sample aspects dictionary (in a real scenario, this would come from the AspectsAgent)
+    aspects = {
+        'skills': """
+        Checkpoint 1: Verify if the candidate lists proficiency in Python and SQL.
+        Checkpoint 2: Check if the candidate mentions experience with data modeling, ETL processes, and data warehousing.
+        Checkpoint 3: Confirm if the candidate lists expertise in machine learning and data visualization tools.
+        """
+    }
+
+    result = agent.run(jd_text, resume_text, aspects)
     print(result)
