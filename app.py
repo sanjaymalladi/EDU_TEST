@@ -4,6 +4,7 @@ from edu_agent import CombinedEducationAgent
 from exp_agent import CombinedExperienceAgent
 from skills_agent import CombinedSkillsAgent
 from supervisor_agent import SupervisorAgent # Import the SupervisorAgent
+from mh_agent import CombinedMHAgent  # Add import for MH agent
 # from mh_agent import CombinedMHAgent # Removed import
 import io
 
@@ -94,77 +95,108 @@ def main():
                 else:
                     st.warning("Skills analysis will be skipped as skills_agent.py was not found.")
 
+                # Add MH agent analysis
+                mh_result = None
+                if CombinedMHAgent:
+                    mh_agent = CombinedMHAgent()
+                    mh_result = mh_agent.run(st.session_state['jd_text'], st.session_state['resume_text'])
+                else:
+                    st.warning("Must-Have analysis will be skipped as mh_agent.py was not found.")
+
                 supervisor_agent = SupervisorAgent()
                 weights, weight_reasoning = supervisor_agent.get_section_weights(st.session_state['jd_text'])
 
                 edu_rating = 0
-                if edu_result and "evaluation" in edu_result and 'Rating' in edu_result['evaluation']:
+                if edu_result and "evaluation" in edu_result:
                     evaluation_str = edu_result['evaluation']
-                    if evaluation_str.startswith("- "):
-                        evaluation_str = evaluation_str[2:]
-                    try:
-                        edu_rating = int(evaluation_str.split("Rating:")[-1].split("**")[0].strip())
-                    except:
-                        edu_rating = 0 
+                    if isinstance(evaluation_str, str):
+                        # Remove any leading dashes or spaces
+                        evaluation_str = evaluation_str.lstrip('-').strip()
+                        # Try to find rating in different formats
+                        if 'Rating:' in evaluation_str:
+                            try:
+                                rating_part = evaluation_str.split('Rating:')[-1].strip()
+                                # Extract first number found
+                                import re
+                                numbers = re.findall(r'\d+', rating_part)
+                                if numbers:
+                                    edu_rating = int(numbers[0])
+                            except Exception as e:
+                                st.error(f"Error extracting education rating: {str(e)}")
 
                 exp_rating = 0
                 exp_rationale = ""
-                if exp_result and "evaluation" in exp_result and 'Rating' in exp_result['evaluation']:
+                if exp_result and "evaluation" in exp_result:
                     evaluation_str = exp_result['evaluation']
-                    if evaluation_str.startswith("- "):
-                        evaluation_str = evaluation_str[2:]
-                    try:
-                        exp_rating = int(evaluation_str.split("Rating:")[-1].split("**")[0].strip())
-                        exp_rationale = exp_result.get('evaluation', '')
-                    except:
-                        exp_rating = 0
-                if exp_result and 'evaluation' in exp_result and 'Evidence' in exp_result['evaluation']:
-                    exp_rationale = exp_result['evaluation']
+                    if isinstance(evaluation_str, str):
+                        # Remove any leading dashes or spaces
+                        evaluation_str = evaluation_str.lstrip('-').strip()
+                        # Try to find rating in different formats
+                        if 'Rating:' in evaluation_str:
+                            try:
+                                rating_part = evaluation_str.split('Rating:')[-1].strip()
+                                # Extract first number found
+                                import re
+                                numbers = re.findall(r'\d+', rating_part)
+                                if numbers:
+                                    exp_rating = int(numbers[0])
+                            except Exception as e:
+                                st.error(f"Error extracting experience rating: {str(e)}")
+                        exp_rationale = evaluation_str
 
                 skills_rating = 0
                 skills_rationale = ""
-                if skills_result and "evaluation" in skills_result and 'Rating' in skills_result['evaluation']:
+                if skills_result and "evaluation" in skills_result:
                     evaluation_str = skills_result['evaluation']
-                    if evaluation_str.startswith("- "):
-                        evaluation_str = evaluation_str[2:]
-                    try:
-                        skills_rating = int(evaluation_str.split("Rating:")[-1].split("**")[0].strip())
-                        skills_rationale = skills_result.get('evaluation', '')
-                    except:
-                        skills_rating = 0
-                if skills_result and 'evaluation' in skills_result and 'Evidence' in skills_result['evaluation']:
-                    skills_rationale = skills_result['evaluation']
+                    if isinstance(evaluation_str, str):
+                        # Remove any leading dashes or spaces
+                        evaluation_str = evaluation_str.lstrip('-').strip()
+                        # Try to find rating in different formats
+                        if 'Rating:' in evaluation_str:
+                            try:
+                                rating_part = evaluation_str.split('Rating:')[-1].strip()
+                                # Extract first number found
+                                import re
+                                numbers = re.findall(r'\d+', rating_part)
+                                if numbers:
+                                    skills_rating = int(numbers[0])
+                            except Exception as e:
+                                st.error(f"Error extracting skills rating: {str(e)}")
+                        skills_rationale = evaluation_str
 
+                # Debug logging
+                st.write("Debug - Ratings:")
+                st.write(f"Education Rating: {edu_rating}")
+                st.write(f"Experience Rating: {exp_rating}")
+                st.write(f"Skills Rating: {skills_rating}")
 
                 # Overall Score Calculation
-                overall_rating = "NA"
-                overall_category = "NA"
+                mh_category = None
+                if mh_result and "evaluation" in mh_result:
+                    evaluation_str = mh_result['evaluation']
+                    if isinstance(evaluation_str, str):
+                        if "Category III" in evaluation_str:
+                            mh_category = "III"
+                        elif "Category II" in evaluation_str:
+                            mh_category = "II"
+                        elif "Category I" in evaluation_str:
+                            mh_category = "I"
 
-                if edu_rating != 0 or exp_rating != 0 or skills_rating != 0:
-                    experience_weight = weights.get('experience', 0)
-                    skills_weight = weights.get('skills', 0)
-                    education_weight = weights.get('education_and_certification', 0)
-
-                    total_weight = experience_weight + skills_weight + education_weight
-
-                    if total_weight != 100.0 and total_weight > 0:
-                        experience_weight = (experience_weight / total_weight) * 100
-                        skills_weight = (skills_weight / total_weight) * 100
-                        education_weight = (education_weight / total_weight) * 100
-                        total_weight = 100.0
-
-                    experience_score = (exp_rating * experience_weight) / 100
-                    skills_score = (skills_rating * skills_weight) / 100
-                    education_score = (edu_rating * education_weight) / 100
-
-                    overall_rating = round(experience_score + skills_score + education_score)
-                    overall_category = supervisor_agent.find_category(overall_rating)
+                overall_rating, overall_category = supervisor_agent.calculate_overall_rating(
+                    edu_rating=edu_rating,
+                    exp_rating=exp_rating,
+                    skills_rating=skills_rating,
+                    weights=weights,
+                    mh_category=mh_category
+                )
 
                 overall_summary = supervisor_agent.generate_summary(
                     experience_rationale=exp_rationale,
                     skills_rationale=skills_rationale,
                     education_rationale=edu_result.get('evaluation', '') if edu_result else ''
                 )
+
+                # Display results
                 st.header("Overall Candidate Analysis")
                 st.subheader(f"Overall Rating: {overall_rating}")
                 st.write(f"**Section Weights:**")
@@ -173,7 +205,19 @@ def main():
                 st.subheader("Summary")
                 st.write(overall_summary)
 
-                
+                # Add Must-Have Analysis Results section
+                if mh_result:
+                    st.header("Must-Have Requirements Analysis")
+                    if "error" in mh_result:
+                        st.error(f"Must-Have Analysis Error: {mh_result['error']}")
+                    else:
+                        st.subheader("🎯 Must-Have Criteria")
+                        st.write(mh_result['aspects'])
+                        st.subheader("🔍 Resume Evidence")
+                        st.write(mh_result['clarifications'])
+                        st.subheader("📊 Must-Have Evaluation")
+                        st.write(mh_result['evaluation'])
+
                 st.header("Education Analysis Results")
                 if "error" in edu_result:
                     st.error(f"Education Analysis Error: {edu_result['error']}")

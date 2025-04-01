@@ -150,3 +150,46 @@ Provide a 2-3 line summary highlighting the candidate's strengths and weaknesses
         chain = LLMChain(llm=self.llm, prompt=prompt)
         summary = chain.run(experience_rationale=experience_rationale, skills_rationale=skills_rationale, education_rationale=education_rationale)
         return summary
+
+    def calculate_overall_rating(self, edu_rating: int, exp_rating: int, skills_rating: int, weights: Dict, mh_category: str = None) -> Tuple[int, str]:
+        """
+        Calculate the overall rating and category based on individual ratings and weights.
+        
+        Args:
+            edu_rating (int): Education rating (0-100)
+            exp_rating (int): Experience rating (0-100)
+            skills_rating (int): Skills rating (0-100)
+            weights (Dict): Dictionary containing weights for each section
+            mh_category (str): Category from Must-Have analysis (I, II, or III)
+            
+        Returns:
+            Tuple[int, str]: Overall rating and category
+        """
+        if edu_rating == 0 and exp_rating == 0 and skills_rating == 0:
+            return "NA", "NA"
+
+        experience_weight = weights.get('experience', 0)
+        skills_weight = weights.get('skills', 0)
+        education_weight = weights.get('education_and_certification', 0)
+
+        total_weight = experience_weight + skills_weight + education_weight
+
+        if total_weight != 100.0 and total_weight > 0:
+            experience_weight = (experience_weight / total_weight) * 100
+            skills_weight = (skills_weight / total_weight) * 100
+            education_weight = (education_weight / total_weight) * 100
+            total_weight = 100.0
+
+        experience_score = (exp_rating * experience_weight) / 100
+        skills_score = (skills_rating * skills_weight) / 100
+        education_score = (edu_rating * education_weight) / 100
+
+        overall_rating = round(experience_score + skills_score + education_score)
+
+        # Apply penalty for missing must-have requirements
+        if mh_category and "III" in mh_category:
+            overall_rating = max(0, overall_rating - 20)  # Reduce by 20 points, but not below 0
+
+        overall_category = self.find_category(overall_rating)
+
+        return overall_rating, overall_category
