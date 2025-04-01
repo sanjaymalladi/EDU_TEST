@@ -164,11 +164,6 @@ def main():
                                 st.error(f"Error extracting skills rating: {str(e)}")
                         skills_rationale = evaluation_str
 
-                # Debug logging
-                st.write("Debug - Ratings:")
-                st.write(f"Education Rating: {edu_rating}")
-                st.write(f"Experience Rating: {exp_rating}")
-                st.write(f"Skills Rating: {skills_rating}")
 
                 # Overall Score Calculation
                 mh_category = None
