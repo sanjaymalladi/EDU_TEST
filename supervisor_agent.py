@@ -54,7 +54,8 @@ class SupervisorAgent:
             google_api_key=api_key,
             temperature=0.0,
             max_output_tokens=4000,  # Use max_output_tokens instead of max_tokens
-            top_p=1
+            top_p=1,
+            top_k=1
         )
 
     def get_section_weights(self, job_description: str) -> Tuple[Dict, Dict]:
