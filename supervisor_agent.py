@@ -50,11 +50,12 @@ class SupervisorAgent:
         if not api_key:
             raise ValueError("GOOGLE_API_KEY environment variable is not set")
         self.llm = ChatGoogleGenerativeAI(
-            model="gemini-2.0-flash-lite",
+            model="gemini-2.0-flash",
             google_api_key=api_key,
             temperature=0.0,
             max_output_tokens=4000,  # Use max_output_tokens instead of max_tokens
-            top_p=1
+            top_p=1,
+            top_k=1
         )
 
     def get_section_weights(self, job_description: str) -> Tuple[Dict, Dict]:
@@ -106,9 +107,7 @@ Assign lower weight (e.g., 10-20%) if practical experience and skills are emphas
 
         try:
             response = chain.run(job_description=job_description)
-            print(f"DEBUG - Raw LLM response for weights: {response}") # Added debug print
             parsed_output = output_parser.parse(response)
-            print(f"DEBUG - Parsed output: {parsed_output}") # Added debug print
 
             weights = {
                 "experience": parsed_output["experience"]["weight"],

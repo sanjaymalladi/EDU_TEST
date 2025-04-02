@@ -14,11 +14,12 @@ if not api_key:
 
 # Initialize the chat model
 model = ChatGoogleGenerativeAI(
-    model="gemini-2.0-flash-lite",  # Specify the Gemini model name
+    model="gemini-2.0-flash",  # Specify the Gemini model name
     google_api_key=api_key,
     temperature=0.0,
     max_output_tokens=4000,  # Use max_output_tokens instead of max_tokens
-    top_p=1
+    top_p=1,
+    top_k=1
 )
 
 # Define the combined agent class
@@ -75,33 +76,29 @@ based solely on the detailed 'Checkpoints' and 'Answer Script' to determine how 
 education/certification requirements.
 **Important**: Think through the reasoning internally, but do not provide or invent detailed chain-
 of-thought. Instead, provide a concise 70-100 word justification focusing on factual details from the
-'Checkpoints' and 'Answer Script', explicitly mentioning the level of detail and alignment.
+'Checkpoints' and 'Answer Script', explicitly mentioning the level of detail and alignment. **Even if the 'Checkpoints' and 'Answer Script' do not discuss certifications, if the candidate's resume shows relevant certifications, factor them into your rating.**
 
 **Input**:
 - Job Description: {job_description}
 - Checkpoints: {checkpoints}
 - Answer Script: {answer_script}
-
+- Resume:{candidates_profile}
 **Output**:
 1) A numeric 'Rating' (1-120)
 2) An 'Evidence' section with a 70-100 word concise justification, focusing only on education and
-certifications mentioned in the 'Checkpoints' and 'Answer Script' and how they align with the JD. Highlight the specific details from the resume that match or don't match the requirements.
+certifications mentioned in the 'Checkpoints' and 'Answer Script' and how they align with the JD. Highlight the specific details from the resume that match or don't match the requirements. **If the 'Checkpoints' or 'Answer Script' lack certification details, still include relevant certifications from the resume in your evaluation.** Explicitly mention the degree names, specializations, universities, certification names, and issuing organizations where applicable. Avoid discussing experience unless explicitly part of the JD's education requirements. Do not include your private chain-of-thought.
 
 ### Steps:
 1) Understand the Job Description with a strong focus on the detailed education/certification requirements.
 2) Compare the candidate's qualifications from the Answer Script with the detailed Checkpoints, paying attention to the specific details extracted.
 3) Assign a score:
-   i) 1–40: Must-have education/certifications explicitly mentioned with specific details are unmet or lacking.
-   ii) 41–60: Meets some must-haves at a basic level but significant details or specific requirements are missing.
-   iii) 61–100: Meets most or all must-haves with good alignment in terms of details. May meet some preferred qualifications.
-   iv) >100: Significantly exceeds requirements, possessing all must-haves with specific details and likely several preferred qualifications.
+    i) 1–40: Must-have education/certifications explicitly mentioned with specific details are unmet or lacking.
+    ii) 41–60: Meets some must-haves at a basic level but significant details or specific requirements are missing. Certifications may add minor points if relevant.
+    iii) 61–100: Meets most or all must-haves with good alignment in terms of details. May meet some preferred qualifications. Relevant certifications, even if not explicitly mentioned, enhance the rating.
+    iv) >100: Significantly exceeds requirements, possessing all must-haves with specific details and likely several preferred qualifications. Relevant certifications, even if not directly requested, are highly valued.
 4) Provide a factual justification (70-100 words) referencing specific examples from the 'Checkpoints'
-   and the detailed 'Answer Script'. Explicitly mention the degree names, specializations, universities, certification names, and issuing organizations where applicable. Avoid discussing experience unless explicitly part of the JD's education requirements. Do not include your private chain-of-thought.
-
-### Output Format:
-**Rating:** [score between 1 and 120]
-**Evidence:** [70-100 word factual justification, e.g., The candidate holds a Master of Science in Data Science from XYZ University, aligning with the requirement for a Master's degree in Data Science. They also possess certifications in Python and Machine Learning as stated in the resume, which are preferred. The resume lacks a certification in R, which was also preferred.]
-        """
+    and the detailed 'Answer Script'. Explicitly mention the degree names, specializations, universities, certification names, and issuing organizations where applicable. Avoid discussing experience unless explicitly part of the JD's education requirements. Do not include your private chain-of-thought.
+"""
         )
 
     def run(self, jd_text: str, resume_text: str, aspects: dict) -> dict:
