@@ -30,7 +30,7 @@ if not api_key:
 
 # Initialize the chat model
 model = ChatGoogleGenerativeAI(
-    model="gemini-2.0-flash-lite",  # Specify the Gemini model name
+    model="gemini-2.0-flash",  # Specify the Gemini model name
     google_api_key=api_key,
     temperature=0.0,
     max_output_tokens=4000,  # Use max_output_tokens instead of max_tokens

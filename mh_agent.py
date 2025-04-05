@@ -3,6 +3,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI  # Import Gemini model
 from langchain.prompts import PromptTemplate
 from langchain_core.messages import HumanMessage
 from dotenv import load_dotenv
+from datetime import datetime
 
 # Load environment variables
 load_dotenv()
@@ -14,7 +15,7 @@ if not api_key:
 
 # Initialize the chat model
 model = ChatGoogleGenerativeAI(
-    model="gemini-2.0-flash-lite",  # Specify the Gemini model name
+    model="gemini-2.0-flash",  # Specify the Gemini model name
     google_api_key=api_key,
     temperature=0.0,
     max_output_tokens=4000,  # Use max_output_tokens instead of max_tokens
@@ -28,7 +29,7 @@ class CombinedMHAgent:
 
         # Define the prompts for each step
         self.clarification_prompt = PromptTemplate(
-            input_variables=["checkpoints", "resume"],
+            input_variables=["checkpoints", "resume", "current_date"],
             template= """
     You are an expert recruiter specializing in reading resumes against job descriptions. Your task is to read the checkpoints provided and extract objective and factual information (if available) from the resume to clarify these checkpoints.
 
@@ -47,6 +48,9 @@ class CombinedMHAgent:
     **Resume:**
     {resume}
 
+    **Current Date:**
+    {current_date}
+
     **Output Format:**
     Checkpoint 1: [Factual reasoning from resume based on checkpoint]
     Checkpoint 2: [Factual reasoning from resume based on checkpoint]
@@ -54,7 +58,7 @@ class CombinedMHAgent:
         )
 
         self.evaluation_prompt = PromptTemplate(
-            input_variables=["job_description", "candidates_profile", "checkpoints", "answer_script"],
+            input_variables=["job_description", "candidates_profile", "checkpoints", "answer_script", "current_date"],
             template="""
             You are an expert recruiter specializing in evaluating resumes against job descriptions.
             Your task is to evaluate and assign a categorisation for the candidate's resume based on the "checkpoints" and "answer_script" provided to understand how well it aligns with the JD. Also provide a brief reasoning. You are required to take a pragmatic and holistic approach considering the context of the resume and understand the implied aspects as well.  For example, if the JD specifies requirement of Graduation and the resume mentions post-graduation, it is implied that the person holds graduation and should be considered as such.
@@ -73,17 +77,17 @@ class CombinedMHAgent:
 
             Step 2 : Analyse if the answers from the checkpoints and answer script satisfy the must-haves while considering the following aspects :
 
-            a)	If there are any checkpoints related to years of experience, do not strictly focus on just the number of years in the literary sense. The number of years should be given due importance, but more importantly, considered holistically  taking into account the context of the role, responsibilities handled by the candidate, etc. Minor deviations in number of years of experience should not lead to disqualification.
+            a)  If there are any checkpoints related to years of experience, do not strictly focus on just the number of years in the literary sense. The number of years should be given due importance, but more importantly, considered holistically  taking into account the context of the role, responsibilities handled by the candidate, etc. Minor deviations in number of years of experience should not lead to disqualification.
 
-            b)	While considering the other checkpoints and answers, take a holistic and a pragmatic approach in understanding and give due importance to both the explicit and implied experiences and skills based on the role/responsibilities, context of the roles and past experiences of the individual. 
+            b)  While considering the other checkpoints and answers, take a holistic and a pragmatic approach in understanding and give due importance to both the explicit and implied experiences and skills based on the role/responsibilities, context of the roles and past experiences of the individual. 
 
             C) If there are any checkpoints related to Education, consider the context while evaluating. For example, if the JD specifies requirement of Graduation and the resume mentions post-graduation, it is implied that the person qualifies for that checkpoint.
 
             Step 3 : Based on the understanding from Step 1 and Step 2, categorise the resume following the criteria specified below :
 
-            a)	Category I : JD does not explicitly or implicitly specify any must-haves or essentials for the resume to be considered for the role.
-            b)	Category II: Satisfies all must-haves explicitly or implicitly. If there is slight uncertainty, give benefit of doubt to the candidate and place him/her in Category II.
-            c)	Category III: Lacks one or more must-haves mentioned in the JD.
+            a)  Category I : JD does not explicitly or implicitly specify any must-haves or essentials for the resume to be considered for the role.
+            b)  Category II: Satisfies all must-haves explicitly or implicitly. If there is slight uncertainty, give benefit of doubt to the candidate and place him/her in Category II.
+            c)  Category III: Lacks one or more must-haves mentioned in the JD.
 
             Step 4. *Provide factual evidence:*
             Provide reasoning for the rating along with observations and explaining why the candidate has been assigned to a particular category. Include specific examples from the "checkpoints" and "Answer script" to support your categorisation.
@@ -97,18 +101,21 @@ class CombinedMHAgent:
 
     def run(self, jd_text: str, resume_text: str, aspects: dict) -> dict:
         try:
+            # Get current date
+            current_date = datetime.now().strftime("%B %d, %Y")
+            
             # Step 1: Use provided aspects (checkpoints) from JD
             aspects_text = aspects.get('mh', '')
             if not aspects_text:
                 return {"error": "No must-have aspects provided."}
 
             # Step 2: Generate clarifications (based on resume)
-            clarifications = self.generate_clarifications(aspects_text, resume_text)
+            clarifications = self.generate_clarifications(aspects_text, resume_text, current_date)
             if not clarifications:
                 return {"error": "Failed to generate clarifications."}
 
             # Step 3: Perform evaluation (based on aspects and clarifications)
-            evaluation = self.evaluate(jd_text, resume_text, aspects_text, clarifications)
+            evaluation = self.evaluate(jd_text, resume_text, aspects_text, clarifications, current_date)
             if not evaluation:
                 return {"error": "Failed to perform evaluation."}
 
@@ -120,17 +127,22 @@ class CombinedMHAgent:
         except Exception as e:
             return {"error": f"An error occurred: {str(e)}"}
 
-    def generate_clarifications(self, checkpoints: str, resume: str) -> str:
-        prompt_text = self.clarification_prompt.format(checkpoints=checkpoints, resume=resume)
+    def generate_clarifications(self, checkpoints: str, resume: str, current_date: str) -> str:
+        prompt_text = self.clarification_prompt.format(
+            checkpoints=checkpoints, 
+            resume=resume,
+            current_date=current_date
+        )
         response = self.model.invoke([HumanMessage(content=prompt_text)])
         return response.content.strip()
 
-    def evaluate(self, job_description: str, profile: str, checkpoints: str, answer_script: str) -> str:
+    def evaluate(self, job_description: str, profile: str, checkpoints: str, answer_script: str, current_date: str) -> str:
         prompt_text = self.evaluation_prompt.format(
             job_description=job_description,
             candidates_profile=profile,
             checkpoints=checkpoints,
-            answer_script=answer_script
+            answer_script=answer_script,
+            current_date=current_date
         )
         response = self.model.invoke([HumanMessage(content=prompt_text)])
         return response.content.strip()

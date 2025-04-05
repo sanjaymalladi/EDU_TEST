@@ -42,6 +42,7 @@ or implies. Include specific details like the name of the degree, major/speciali
 - Be careful and consider industry jargon while reading resumes. For example CA or ICAI are usually
 written instead of Chartered Accountant. ICWAI is now called ICMAI. Abbreviations are quite often
 written for various certifications as well.
+- Consider and understand the implied qualifications. For example : If a candidate is a post graduate in a particular specialisation, it implies that he is a graduate as well.
 
 **Input**:
 - Checkpoints: {checkpoints}
@@ -71,27 +72,29 @@ Checkpoint 3: [Detailed factual clarification based on resume, e.g., Earned a Ba
         self.evaluation_prompt = PromptTemplate(
             input_variables=["job_description", "candidates_profile", "checkpoints", "answer_script"],
             template="""You are an expert recruiter specializing in evaluating resumes against job descriptions.
-Your task is to evaluate and assign a numeric rating for the candidate's education and certifications
+Your task is to pragmatically evaluate and assign a numeric rating for the candidate's education and certifications
 based solely on the detailed 'Checkpoints' and 'Answer Script' to determine how well they align with the JD's
 education/certification requirements.
 **Important**: Think through the reasoning internally, but do not provide or invent detailed chain-
 of-thought. Instead, provide a concise 70-100 word justification focusing on factual details from the
-'Checkpoints' and 'Answer Script', explicitly mentioning the level of detail and alignment. **Even if the 'Checkpoints' and 'Answer Script' do not discuss certifications, if the candidate's resume shows relevant certifications, factor them into your rating.**
+'Checkpoints' and 'Answer Script', explicitly mentioning the level of detail and alignment.
 
 **Input**:
 - Job Description: {job_description}
 - Checkpoints: {checkpoints}
 - Answer Script: {answer_script}
-- Resume:{candidates_profile}
+
 **Output**:
 1) A numeric 'Rating' (1-120)
 2) An 'Evidence' section with a 70-100 word concise justification, focusing only on education and
-certifications mentioned in the 'Checkpoints' and 'Answer Script' and how they align with the JD. Highlight the specific details from the resume that match or don't match the requirements. **If the 'Checkpoints' or 'Answer Script' lack certification details, still include relevant certifications from the resume in your evaluation.** Explicitly mention the degree names, specializations, universities, certification names, and issuing organizations where applicable. Avoid discussing experience unless explicitly part of the JD's education requirements. Do not include your private chain-of-thought.
+certifications mentioned in the 'Checkpoints' and 'Answer Script' and how they align with the JD. Highlight the specific details from the resume that match or don't match the requirements.Explicitly mention the degree names, specializations, universities, certification names, and issuing organizations where applicable. Avoid discussing experience unless explicitly part of the JD's education requirements. Do not include your private chain-of-thought.
 
 ### Steps:
 1) Understand the Job Description with a strong focus on the detailed education/certification requirements.
 2) Compare the candidate's qualifications from the Answer Script with the detailed Checkpoints, paying attention to the specific details extracted.
-3) Assign a score:
+3) If the JD does not specify any certification requirements and the candidate has relevant certifications award a bonus score. If the candidate does not possess any certifications that are not specified in the JD, do not reduce score. 
+4) If the JD gives general direction such as ‘any graduation’ consider graduation in specialisation to be a match. Do not reduce score in such instances.
+5) Assign a score:
     i) 1–40: Must-have education/certifications explicitly mentioned with specific details are unmet or lacking.
     ii) 41–60: Meets some must-haves at a basic level but significant details or specific requirements are missing. Certifications may add minor points if relevant.
     iii) 61–100: Meets most or all must-haves with good alignment in terms of details. May meet some preferred qualifications. Relevant certifications, even if not explicitly mentioned, enhance the rating.

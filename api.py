@@ -22,7 +22,7 @@ if not api_key:
 
 # Initialize the chat model
 model = ChatGoogleGenerativeAI(
-    model="gemini-2.0-flash-lite",  # Specify the Gemini model name
+    model="gemini-2.0-flash",  # Specify the Gemini model name
     google_api_key=api_key,
     temperature=0.0,
     max_output_tokens=4000,  # Use max_output_tokens instead of max_tokens
@@ -250,6 +250,9 @@ async def evaluate_resume(request: EvaluationRequest) -> EvaluationResponse:
         mh_agent = CombinedMHAgent()
         supervisor_agent = SupervisorAgent()
 
+        # Get current date
+        current_date = datetime.now().strftime("%B %d, %Y")
+
         # Create thread pool executor
         with ThreadPoolExecutor(max_workers=4) as executor:
             # Run evaluations in parallel
@@ -363,6 +366,9 @@ async def analyze_resume(
         # Read file contents
         jd_text = await read_file_content(jd_file)
         resume_text = await read_file_content(resume_file)
+
+        # Get current date
+        current_date = datetime.now().strftime("%B %d, %Y")
 
         # Generate aspects
         aspects_agent = AspectsAgent()

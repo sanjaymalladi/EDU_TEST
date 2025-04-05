@@ -15,7 +15,7 @@ if not api_key:
 
 # Initialize the chat model
 model = ChatGoogleGenerativeAI(
-    model="gemini-2.0-flash-lite",  # Specify the Gemini model name
+    model="gemini-2.0-flash",  # Specify the Gemini model name
     google_api_key=api_key,
     temperature=0.0,
     max_output_tokens=4000,  # Use max_output_tokens instead of max_tokens
@@ -31,9 +31,7 @@ class AspectsAgent:
             input_variables=["job_description"],
             template="""
 You are an expert recruiter specializing in analyzing resumes against job descriptions (JDs).
-Your task is to formulate a set of 1–3 detailed 'Checkpoints' from the JD that focus solely on the candidate's
-education and certifications. These Checkpoints will be used in the next step to evaluate the
-candidate's suitability. Aim for specific and granular checkpoints.
+Your task is to formulate a set of 1–3 detailed 'Checkpoints' from the JD that focus solely on the candidate's education and certifications. These Checkpoints will be used in the next step to evaluate the candidate’s suitability. Aim for specific and granular checkpoints.
 
 Important:
 - Think through your reasoning privately (step by step) but do not include that chain-of-thought
@@ -54,9 +52,10 @@ and certifications, serving as verification criteria for the next step.
    - If specific institutions or levels of prestige are implied or stated, note them.
    - If certain types or levels of certifications are required, make them explicit.
    - For preferred qualifications, think about how they would ideally look in a candidate's profile.
-2. Frame 1–3 detailed checkpoints that are most relevant to the JD's education and certification requirements.
-   - Each checkpoint should ideally focus on a specific aspect (e.g., specific degree, specific certification, specific field of study).
+2. With a holistic and pragmatic approach, frame 1–3 detailed checkpoints that are most relevant to the JD's education and certification requirements.
+   - Each checkpoint should ideally focus on a specific aspect (e.g., specific degree, specific certification, specific field of study, institutions if specified in JD).
    - Ensure the checkpoints are actionable and can be clearly verified against a resume.
+   - If certifications are not mentioned in the JD, it is still preferred to formulate one checkpoint to read if the candidate has any relevant certifications that could add value to the role/performance in the role.
 3. Keep these guidelines in mind:
    - Check for the exact names of required degrees, certifications, and any specified specializations.
    - If the JD mentions preferred qualifications, formulate checkpoints that reflect the ideal candidate's educational background and certifications.
@@ -100,19 +99,18 @@ These checkpoints/criteria will serve as criteria for the next step, where the c
 
     2) Include at least one checkpoint for understanding the actual years of experience required for key technologies/core areas and overall years of professional experience in the field.
 
-    3) Include at least one checkpoint to assess the relevance of recent professional experience, responsibilities, and alignment with the core domain specified in the JD.
-        a. Checkpoint Example: Check if the candidate's most recent role and responsibilities align with the key responsibilities outlined in the JD. Highlight deviations from the core role and their duration.
+    3) Important : Include at least one checkpoint to assess the relevance of recent professional experience, responsibilities, and alignment with the core domain specified in the JD.
+        a. Checkpoint Example: Check if the candidate’s most recent role and responsibilities align with the key responsibilities outlined in the JD. Highlight deviations from the core role and their duration.
 
     4) Include at least one checkpoint to analyze career stability, such as job switches, career gaps (exceeding two months), and whether the candidate is currently employed and for how long.
         a. Checkpoint Example: Examine the chronology of job switches and career gaps. Are there gaps longer than two months between jobs? Has the candidate demonstrated frequent job changes? Are they currently employed in a relevant role? **Think step by step.**
 
     5) Address industry-specific requirements if applicable. If the JD specifies the role to be industry-specific, include a checkpoint for assessing relevant industry experience. Skip this if the role is not industry-specific.
-
     6) Include one checkpoint to evaluate the candidate's career progression and responsibilities in past professional roles, ensuring a logical sequence in work history and growth in responsibilities. This checkpoint is more important in roles which have a higher number of years of experience and can be ignored for beginners.
 
-    7) Include checkpoints that probe into detailed subtopics or concepts relevant to success in the role, eliciting comprehensive insights about the candidate's professional qualifications and their application in practical scenarios.
+    7) Include checkpoints that probe into detailed subtopics or concepts relevant to success in the role, eliciting comprehensive insights about the candidate’s professional qualifications and their application in practical scenarios.
 
-    8) Include a checkpoint to uncover the candidate's achievements or individual contributions to past projects or assignments for a nuanced understanding of their professional role and impact.
+    8) Include a checkpoint to uncover the candidate’s achievements or individual contributions to past projects or assignments for a nuanced understanding of their professional role and impact.
 
     9) Core Domain expertise/experience with respect to the role specified in the JD, focusing on the practical application of this expertise in previous roles.
         a. Example: For a Workday HCM professional, differentiate their practical experience from Workday Finance implementations.
@@ -150,17 +148,27 @@ These checkpoints/criteria will serve as criteria for the next step, where the c
     **Output**: Formulate 2 to 3 evaluation checkpoints/criteria focused solely on the must-have requirements. These checkpoints/criteria will serve as evaluation criteria for the next stage, where the candidate's resume will be checked for evidence and reasoning.
 
     ### Steps:
-    1) Understand the JD and determine the number of checkpoints (between 2-3) required depending on the specifications from the JD and the context of the role. For freshers/career beginners, the number of checkpoints could be less in number.
-    2) With a holistic and pragmatic approach, formulate the checkpoints that cover the verifiable aspects usually available from resumes. Note that the cultural aspects or thinking process or future plans of the candidate should not be part of this exercise.
 
-    **Guidelines**:
-    1. Identify parameters explicitly marked as must-have in the JD.
-        a. Consider the context and include aspects labeled as "required," "mandatory," "essential," "prerequisite," or similar if appropriate to be considered as must-have.
-        b. Focus only on very critical criteria that, if missing, should lead to disqualification of the candidate.
-    2. Clearly differentiate between must-haves and good-to-haves/preferences.
-        a. Exclude any parameters described as "preferred," "nice-to-have," or optional.
-    3. If specific education, certification, or experience is not explicitly mentioned as a must-have, do not include it in this section.
-    
+Scenario I : If a separate "must-haves" section is provided in the JD, only include the points from that section. Do not add any additional criteria, regardless of whether they are mentioned elsewhere in the JD.
+Scenario II : If no separate "must-haves" section exists:
+•	Identify and include only the explicit must-haves in the JD, such as requirements labeled as "required," "mandatory," "essential," or similar.
+•	If no must-haves are explicitly written, focus solely on critical, non-negotiable requirements for the role. Do not include any "good-to-have" or "preferred" criteria depending on the JD and the context of the role.
+•	If the JD mentions specific years of experience as a must-have, include this in the evaluation criteria.
+2)  Do not stuff too many tool/skill requirements into one checkpoint.
+3)  For freshers/career beginners, the number of checkpoints should not be more than 2.
+4)  With a holistic and pragmatic approach, formulate the checkpoints that cover the verifiable aspects usually available from resumes. Note that the cultural aspects or thinking process or future plans of the candidate should not be part of this exercise.
+
+    **Guidelines**: Ensure that output set of checkpoints/criteria should adhere to each of the following guidelines:
+ 
+Scenario I : Formulate checkpoints reflecting the must-have’s explicitly mentioned in the must-have section.
+
+Scenario II : If no must-have section is written, identify parameters explicitly marked as must-have in the JD. 
+a.  Consider the context, note the aspects labelled as “required,” “mandatory,” “essential,” “prerequisite,” or similar if appropriate to be considered as must-have.
+b.  Focus only on very critical criteria that, if missing, should lead to disqualification of the candidate.
+2.  If number of years of experience is mentioned in the JD as a must-have, it is important to include it in the must-haves aspects.
+3.  Clearly differentiate between must-haves and good-to-haves/preferences and exclude any parameters described as “preferred,” “nice-to-have,” or optional.
+4.  If specific education, certification, or experience is not explicitly mentioned as a must-have, do not include it in this section.
+Important note: The sole focus of this section is to verify absolute must-haves that are explicitly mentioned in the JD or are uncompromisable requirements. Do not combine/include too many aspects into one checkpoint. Avoid including good-to-have or preference-based criteria in this section. Think step by step.
     **Output Format:**
     Checkpoint 1: [Description of checkpoint]
     Checkpoint 2: [Description of checkpoint]"""
@@ -169,8 +177,7 @@ These checkpoints/criteria will serve as criteria for the next step, where the c
         # Prompt for Skills Aspects (copied from skills_agent.py)
         self.skills_aspects_prompt = PromptTemplate(
             input_variables=["job_description"],
-            template="""
-You are an expert recruiter specializing in analyzing resumes against job descriptions (JDs). Your task is to formulate only skills verification checkpoints that will generate factual insights in the next step, helping to analyze the candidate's technical and domain skills in relation to the job requirements. Keep in consideration that resumes may list skills without detailed examples.
+            template="""You are an expert recruiter specializing in analyzing resumes against job descriptions (JDs). Your task is to formulate only skills verification checkpoints that will generate factual insights in the next step, helping to analyze the candidate’s technical and domain skills in relation to the job requirements. Keep in consideration that resumes may list skills without detailed examples.
 
 **Input**: Job Description (JD)
 **Job Description**:
